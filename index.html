@@ -18,7 +18,7 @@ button{border:0;cursor:pointer;color:inherit}
 #fitpulseApp{display:none}
 .app{height:100vh;max-width:1180px;margin:auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden}
 .topbar{height:74px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(10,18,35,.96);border-bottom:1px solid var(--line);z-index:1000}
-.brand{display:flex;align-items:center;gap:11px}.logo{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#20e0ad,#18b6d5);display:grid;place-items:center;color:#041019;font-size:23px;font-weight:900;box-shadow:0 8px 25px #12d9a52b}
+.brand{display:flex;align-items:center;gap:11px}.logo{width:40px;height:40px;border-radius:13px;background:linear-gradient(135deg,#20e0ad,#18b6d5);display:grid;place-items:center;color:#041019;font-size:16px;letter-spacing:-1px;font-weight:1000;box-shadow:0 8px 25px #12d9a52b;border:1px solid #79f6dc66}
 .brand b{font-size:20px;letter-spacing:.3px}.brand small{display:block;color:#29d4ad;font-size:9px;font-weight:800;letter-spacing:1.3px;margin-top:-2px}
 .top-actions{display:flex;align-items:center;gap:10px}.points{border:1px solid #6d4d0b;background:#241b09;color:#ffc24d;border-radius:14px;padding:8px 12px;font-size:12px;font-weight:800}.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2dd4bf,#7c3aed);display:grid;place-items:center;border:2px solid #20d5ac;font-weight:900}
 .main{position:relative;flex:1;min-height:0;overflow:hidden}.screen{position:absolute;inset:0;overflow:auto;padding:18px;padding-bottom:95px;background:var(--bg)}.hidden{display:none!important}.screen#map:not(.hidden){z-index:50!important}
@@ -300,7 +300,7 @@ button{border:0;cursor:pointer;color:inherit}
 <div id="loginPage">
   <div class="login-shell">
     <div class="login-brand">
-      <div class="login-logo">ϟ</div>
+      <div class="login-logo" aria-label="SmartPro">SP</div>
       <h1>SmartPro</h1>
       <p>MULTI-SPORT PRO</p>
     </div>
@@ -322,7 +322,7 @@ button{border:0;cursor:pointer;color:inherit}
 </div>
 <div class="app" id="fitpulseApp">
 <header class="topbar">
-  <div class="brand"><div class="logo">ϟ</div><div><b>SmartPro</b><small>MULTI-SPORT PRO</small></div></div>
+  <div class="brand"><div class="logo" aria-label="SmartPro">SP</div><div><b>SmartPro</b><small>MULTI-SPORT PRO</small></div></div>
   <div class="top-actions"><div class="points">◉ <span id="points">0</span> pts</div><button class="avatar" onclick="show('profile')">AT</button></div>
 </header>
 
@@ -740,7 +740,7 @@ function show(id){
  const previous=current; current=id;screens.forEach(s=>document.getElementById(s)?.classList.toggle('hidden',s!==id));
  document.querySelectorAll('.nav').forEach(n=>n.classList.remove('active'));
  document.getElementById('nav-'+(id==='pointsScreen'?'points':id))?.classList.add('active');
- if(id==='map') setTimeout(()=>{initMap(); if(map)map.invalidateSize(true); startUserLocationTracking();},120);
+ if(id==='map') setTimeout(()=>{initMap(); if(map)map.invalidateSize(true); startUserLocationTracking(); if(typeof loadRealAthletes==='function')loadRealAthletes();},120);
  if(id==='activity'){ if(timerId===null && previous!=='activity')prepareNewWorkout(); startTimer(); }
  if(id==='pointsScreen') renderHistory();
 }
@@ -869,7 +869,7 @@ function updateLiveCount(){
  document.getElementById('liveCountMap')?.replaceChildren(document.createTextNode(n));
  document.getElementById('liveCountHome')?.replaceChildren(document.createTextNode(n));
  const status=document.getElementById('liveStatus');
- if(status)status.textContent=n?`${n} usuário(s) real(is) compartilharam a localização voluntariamente.`:'Nenhum usuário real compartilhando neste momento.';
+ if(status)status.textContent=n?`${n} usuário(s) real(is) compartilhando a localização.`:'Nenhum usuário real compartilhando neste momento.';
 }
 function toggleMyLocation(){
  if(!map)return;
@@ -1442,16 +1442,30 @@ function filterGroups(btn,sport){
 
 /* Marker com foto de perfil quando a API enviar photo/avatar */
 function addMarkersV3(data){
- if(window.markerLayer)window.markerLayer.clearLayers();else window.markerLayer=L.layerGroup().addTo(map);
+ if(!map)return;
+ if(window.markerLayer)window.markerLayer.clearLayers();
+ else window.markerLayer=L.layerGroup().addTo(map);
+ const points=[];
  data.forEach(a=>{
-  const initials=(a.initials||a.name.split(/\s+/).map(x=>x[0]).slice(0,2).join('')).toUpperCase();
+  const lat=Number(a.lat), lon=Number(a.lon);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
+  const initials=(a.initials||String(a.name||'AT').split(/\s+/).map(x=>x[0]).slice(0,2).join('')).toUpperCase();
   const emoji=a.emoji||sportEmoji(a.sport);
   const photo=a.photo||a.avatar||'';
-  const style=photo?`background-image:url("${String(photo).replace(/"/g,'&quot;')}");color:transparent`:`background-color:${a.c||'#16c8a0'};color:#06131c`;
-  const icon=L.divIcon({className:'',html:`<div class="profile-marker" style="${style}">${photo?'':initials}<em>${emoji}</em></div>`,iconSize:[50,50],iconAnchor:[25,25]});
-  const m=L.marker([Number(a.lat),Number(a.lon)],{icon}).addTo(window.markerLayer);
-  m.bindPopup(`<b>${escapeHtml(a.name)}</b><br><span style="font-size:11px">${emoji} ${escapeHtml(a.sport)}</span><br><small>Localização compartilhada voluntariamente</small>`);
+  const style=photo
+    ? `background-image:url("${String(photo).replace(/"/g,'&quot;')}");background-size:cover;background-position:center;color:transparent`
+    : `background-color:${a.c||'#16c8a0'};color:#06131c`;
+  const icon=L.divIcon({className:'',html:`<div class="profile-marker" style="${style}">${photo?'':escapeHtml(initials)}<em>${emoji}</em></div>`,iconSize:[50,50],iconAnchor:[25,25]});
+  const m=L.marker([lat,lon],{icon}).addTo(window.markerLayer);
+  m.bindPopup(`<b>${escapeHtml(a.name||'Atleta')}</b><br><span style="font-size:11px">${emoji} ${escapeHtml(a.sport||'Online')}</span><br><small>Online · localização compartilhada voluntariamente</small>`);
+  points.push([lat,lon]);
  });
+ // Mostra todas as pessoas reais dentro da área visível do mapa.
+ if(points.length===1){
+   map.setView(points[0],15,{animate:true});
+ }else if(points.length>1){
+   map.fitBounds(L.latLngBounds(points),{padding:[70,70],maxZoom:15,animate:true});
+ }
 }
 addMarkers=addMarkersV3;
 
@@ -1832,6 +1846,254 @@ function initMap(){
   setTimeout(()=>requestUserLocation(false),250);
 }
 
+</script>
+
+<style id="smartpro-functional-upgrade">
+
+
+/* ===== SMARTPRO FUNCTIONAL UPGRADE ===== */
+.activity-live{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.activity-live .metric{min-height:72px}
+.gps-pill{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:#0d1d2d;border:1px solid #28415c;font-size:10px;color:#b9c6d8}
+.gps-pill.ok{border-color:#1d806d;color:#6ff0cf}.gps-pill.warn{border-color:#8a6320;color:#ffd27c}
+.route-mini{height:170px;border-radius:16px;overflow:hidden;border:1px solid #263852;background:#0b1422;margin:14px 0}
+.history-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.history-actions button{font-size:9px;padding:7px 10px}
+.sp-toast{position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:9999;background:#0c1727;border:1px solid #2b405d;color:#e9f2ff;border-radius:13px;padding:10px 14px;font-size:11px;box-shadow:0 10px 30px #0007;transition:.25s;pointer-events:none}
+.sp-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(max-width:700px){.activity-live{grid-template-columns:repeat(2,1fr)}}
+</style>
+<script id="smartpro-functional-upgrade-js">
+(function(){
+  'use strict';
+
+  /* REST API opcional. Deixe vazio para usar o modo local. Para usuários reais,
+     a API precisa implementar GET /athletes/live e POST /athletes/location. */
+  window.SMARTPRO_BACKEND = window.SMARTPRO_BACKEND || (location.protocol.startsWith('http') ? '/api' : 'http://localhost:3000/api');
+  window.SMARTPRO_LOCATION_INTERVAL = 5000;
+
+  let workoutDistanceMeters=0;
+  let workoutLastPoint=null;
+  let workoutStartedAt=null;
+  let workoutPausedAt=null;
+  let workoutPausedMs=0;
+  let workoutElapsedBeforePause=0;
+  let workoutGpsReady=false;
+  let workoutSaved=false;
+
+  function toast(msg){
+    let el=document.getElementById('spToast');
+    if(!el){el=document.createElement('div');el.id='spToast';el.className='sp-toast';document.body.appendChild(el)}
+    el.textContent=msg;el.classList.add('show');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),2600);
+  }
+  window.smartToast=toast;
+
+  function num(id){return Number(String(document.getElementById(id)?.textContent||'0').replace(',','.'))||0}
+  function setText(id,v){const e=document.getElementById(id);if(e)e.textContent=v}
+  function formatHMS(sec){
+    sec=Math.max(0,Math.floor(sec));
+    return [Math.floor(sec/3600),Math.floor(sec%3600/60),sec%60].map(v=>String(v).padStart(2,'0')).join(':');
+  }
+  function meters(a,b){
+    const R=6371000,lat1=a[0]*Math.PI/180,lat2=b[0]*Math.PI/180;
+    const dLat=(b[0]-a[0])*Math.PI/180,dLon=(b[1]-a[1])*Math.PI/180;
+    const h=Math.sin(dLat/2)**2+Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+    return 2*R*Math.asin(Math.sqrt(h));
+  }
+  function calorieRate(sport){
+    return ({'Corrida':75,'Ciclismo':45,'Bike':45,'Caminhada':48,'Trilha':65,'Futebol':70,'Basquete':70,'Vôlei':55,'Tênis':60,'Natação':60,'Yoga':30}[sport]||55);
+  }
+  function currentElapsed(){
+    if(!workoutStartedAt)return 0;
+    if(typeof running!=='undefined' && running){return workoutElapsedBeforePause+Math.floor((Date.now()-workoutStartedAt)/1000)}
+    return workoutElapsedBeforePause;
+  }
+  function updateWorkoutMetrics(){
+    const km=workoutDistanceMeters/1000;
+    const sec=Math.max(0,currentElapsed());
+    const speed=sec>0?km/(sec/3600):0;
+    const sport=document.getElementById('sportName')?.textContent||'Caminhada';
+    setText('distance',km.toFixed(2).replace('.',','));
+    setText('speed',speed.toFixed(1).replace('.',','));
+    setText('calories',Math.round(km*calorieRate(sport)));
+    setText('timer',formatHMS(sec));
+  }
+  function resetWorkout(){
+    workoutDistanceMeters=0;workoutLastPoint=null;workoutStartedAt=Date.now();workoutPausedAt=null;workoutPausedMs=0;workoutElapsedBeforePause=0;workoutGpsReady=false;workoutSaved=false;
+    if(typeof gpsTrack!=='undefined')gpsTrack=[];
+    if(typeof gpsLastPoint!=='undefined')gpsLastPoint=null;
+    if(typeof miniMap!=='undefined' && miniMap && typeof clearMiniTrack==='function')clearMiniTrack();
+    updateWorkoutMetrics();
+  }
+  function addGpsPoint(lat,lng,accuracy){
+    if(!running||!Number.isFinite(lat)||!Number.isFinite(lng))return;
+    if(Number.isFinite(accuracy)&&accuracy>60)return;
+    const p=[lat,lng];
+    if(!workoutLastPoint){workoutLastPoint=p;workoutGpsReady=true;if(typeof gpsTrack!=='undefined')gpsTrack=[p];updateWorkoutMetrics();return}
+    const d=meters(workoutLastPoint,p);
+    if(d<8)return;
+    if(d>120)return;
+    workoutDistanceMeters+=d;workoutLastPoint=p;workoutGpsReady=true;
+    if(typeof gpsTrack!=='undefined'){gpsTrack.push(p);if(typeof drawMiniRoute==='function')drawMiniRoute()}
+    updateWorkoutMetrics();
+  }
+  window.smartAddGpsPoint=addGpsPoint;
+
+  /* Substitui o GPS do protótipo por um acumulador real, sem criar distância fictícia. */
+  const originalStartRealGps=window.startRealGps;
+  window.startRealGps=function(){
+    if(!navigator.geolocation){toast('Seu navegador não oferece GPS.');return}
+    if(window.gpsWatchId!==null)return;
+    window.gpsWatchId=navigator.geolocation.watchPosition(pos=>{
+      const lat=Number(pos.coords.latitude),lng=Number(pos.coords.longitude),acc=Number(pos.coords.accuracy)||0;
+      if(typeof updateUserLocationMarker==='function')updateUserLocationMarker(lat,lng,acc);
+      addGpsPoint(lat,lng,acc);
+    },()=>toast('Não foi possível atualizar o GPS.'),{enableHighAccuracy:true,maximumAge:1000,timeout:15000});
+  };
+
+  window.prepareNewWorkout=function(){
+    if(typeof stopRealGps==='function')stopRealGps();
+    if(typeof running!=='undefined')running=true;
+    if(typeof timerId!=='undefined'&&timerId){clearInterval(timerId);timerId=null}
+    resetWorkout();
+    updateWorkoutMetrics();
+    toast('Treino pronto. Permita o GPS para registrar a rota real.');
+  };
+
+  window.startTimer=function(){
+    if(timerId)return;
+    if(!workoutStartedAt)resetWorkout();
+    running=true;
+    workoutPausedAt=null;
+    if(typeof startRealGps==='function')startRealGps();
+    timerId=setInterval(()=>{if(running)updateWorkoutMetrics()},500);
+    updateWorkoutMetrics();
+  };
+
+  window.pauseTimer=function(){
+    if(!running){
+      running=true;
+      workoutStartedAt=Date.now();
+      if(typeof startRealGps==='function')startRealGps();
+      toast('Treino retomado');
+    }else{
+      workoutElapsedBeforePause=currentElapsed();
+      running=false;workoutPausedAt=Date.now();
+      if(typeof stopRealGps==='function')stopRealGps();
+      updateWorkoutMetrics();toast('Treino pausado');
+    }
+  };
+
+  window.finishWorkout=function(){
+    if(workoutSaved)return;
+    workoutElapsedBeforePause=currentElapsed();running=false;
+    if(typeof stopRealGps==='function')stopRealGps();
+    if(timerId){clearInterval(timerId);timerId=null}
+    updateWorkoutMetrics();
+    const dist=num('distance'),cal=num('calories'),time=document.getElementById('timer')?.textContent||'00:00:00';
+    setText('sumTime',time);setText('sumDist',dist.toFixed(2).replace('.',','));setText('sumCal',Math.round(cal));
+    document.getElementById('finishModal')?.classList.add('open');
+  };
+
+  window.registerFinishedActivity=function(){
+    if(workoutSaved)return;
+    const distance=Number((document.getElementById('distance')?.textContent||'0').replace(',','.'))||0;
+    const calories=Math.round(num('calories'));
+    const time=document.getElementById('timer')?.textContent||'00:00:00';
+    const sport=document.getElementById('sportName')?.textContent||'Atividade';
+    const points=distance>0?Math.max(5,Math.round(distance*2)+5):0;
+    const route=(typeof gpsTrack!=='undefined'&&Array.isArray(gpsTrack))?gpsTrack.map(p=>[Number(p[0]),Number(p[1])]):[];
+    const item={id:Date.now(),date:new Date().toISOString(),sport,time,distance,calories,points,route,gps:route.length>0,averageSpeed:num('speed')};
+    if(!Array.isArray(activityHistory))activityHistory=[];
+    activityHistory.unshift(item);saveHistory();workoutSaved=true;
+    refreshUserDashboard();
+    closeFinish();
+    if(route.length)toast('Treino e rota GPS salvos com sucesso.');else toast('Treino salvo. Nenhuma rota GPS foi registrada.');
+    show('pointsScreen');
+  };
+
+  /* Histórico com ação para abrir a rota salva. */
+  window.renderHistory=function(){
+    const list=document.getElementById('historyList');if(!list)return;
+    const totalDistance=(activityHistory||[]).reduce((s,a)=>s+(Number(a.distance)||0),0);
+    const totalPoints=(activityHistory||[]).reduce((s,a)=>s+(Number(a.points)||0),0);
+    setText('historyCount',(activityHistory||[]).length);setText('historyDistance',totalDistance.toFixed(2).replace('.',',')+' km');setText('historyPoints',totalPoints);
+    if(!activityHistory?.length){list.innerHTML='<div class="card"><b>📭 Nenhum treino registrado ainda</b><p class="muted" style="font-size:10px">Finalize um treino para ele aparecer aqui.</p></div>';return}
+    list.innerHTML=activityHistory.map((a,i)=>{
+      const route=Array.isArray(a.route)&&a.route.length>1;
+      return `<div class="history" style="padding:14px"><div style="flex:1"><b>${sportEmoji(a.sport)} ${escapeHtml(a.sport)}</b><small>${formatDateTime(a.date)}</small><div style="display:flex;gap:14px;margin-top:9px;flex-wrap:wrap"><span class="muted" style="font-size:10px">⏱️ ${escapeHtml(a.time)}</span><span class="muted" style="font-size:10px">📍 ${Number(a.distance||0).toFixed(2).replace('.',',')} km</span><span class="muted" style="font-size:10px">🔥 ${Math.round(a.calories||0)} kcal</span></div><div class="history-actions">${route?`<button class="secondary" onclick="viewSavedRoute(${i})">🗺️ Ver rota</button>`:''}<button class="secondary" onclick="deleteSavedWorkout(${i})">🗑️ Apagar</button></div></div><span class="badge">+${a.points||0} pts</span></div>`;
+    }).join('');
+  };
+  window.deleteSavedWorkout=function(index){
+    if(!confirm('Apagar este treino do histórico?'))return;
+    activityHistory.splice(index,1);saveHistory();refreshUserDashboard();toast('Treino apagado.');
+  };
+  window.viewSavedRoute=function(index){
+    const a=activityHistory[index];if(!a?.route?.length){toast('Este treino não possui rota GPS.');return}
+    show('map');setTimeout(()=>{
+      initMap();
+      const pts=a.route.map(p=>[Number(p[0]),Number(p[1])]).filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
+      if(!pts.length)return;
+      if(window.savedRouteLayer)map.removeLayer(window.savedRouteLayer);
+      window.savedRouteLayer=L.polyline(pts,{color:'#16d3a2',weight:6,lineCap:'round',lineJoin:'round'}).addTo(map);
+      L.circleMarker(pts[0],{radius:6,color:'#fff',weight:2,fillColor:'#ff8a1f',fillOpacity:1}).addTo(window.savedRouteLayer);
+      L.circleMarker(pts[pts.length-1],{radius:7,color:'#fff',weight:2,fillColor:'#16d3a2',fillOpacity:1}).addTo(window.savedRouteLayer);
+      map.fitBounds(L.latLngBounds(pts),{padding:[40,40],maxZoom:17});
+      toast('Rota salva aberta no mapa.');
+    },250);
+  };
+
+  /* Persistência das configurações de privacidade. */
+  function privacyKey(){return userDataKey('smartpro_privacy',currentSmartUser||'atleta')}
+  function loadPrivacy(){
+    let d={live:false,hideHome:true,profile:true,notifications:true};
+    try{Object.assign(d,JSON.parse(localStorage.getItem(privacyKey())||'{}'))}catch(e){}
+    document.querySelectorAll('#home .setting .toggle').forEach((b,i)=>{const keys=['live','hideHome','profile','notifications'];b.classList.toggle('on',!!d[keys[i]]);b.dataset.privacy=keys[i]});
+  }
+  document.querySelectorAll('#home .setting .toggle').forEach(btn=>btn.addEventListener('click',function(){
+    const key=this.dataset.privacy;if(!key)return;let d={};try{d=JSON.parse(localStorage.getItem(privacyKey())||'{}')}catch(e){}d[key]=this.classList.contains('on');localStorage.setItem(privacyKey(),JSON.stringify(d));
+    if(key==='live' && !d[key] && typeof toggleMyLocation==='function' && sharingMyLocation)toggleMyLocation();
+    toast(d[key]?'Configuração ativada':'Configuração desativada');
+  }));
+  window.addEventListener('load',()=>setTimeout(loadPrivacy,100));
+
+  /* Usuários reais: publica somente se houver backend configurado e compartilhamento autorizado. */
+  let publishTimer=null;
+  async function publishLocation(){
+    if(!SMARTPRO_BACKEND||!sharingMyLocation||!latestUserLocation)return;
+    try{await fetch(SMARTPRO_BACKEND.replace(/\/$/,'')+'/athletes/location',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:currentSmartUser,name:profileData?.name||'Atleta',sport:document.getElementById('sportName')?.textContent||'Atividade',lat:latestUserLocation[0],lon:latestUserLocation[1],shared:true})})}catch(e){}
+  }
+  function startPublish(){if(publishTimer)return;publishTimer=setInterval(publishLocation,SMARTPRO_LOCATION_INTERVAL);publishLocation()}
+  window.stopPublishLocation=function(){if(publishTimer){clearInterval(publishTimer);publishTimer=null}if(SMARTPRO_BACKEND&&currentSmartUser)fetch(SMARTPRO_BACKEND.replace(/\/$/,'')+'/athletes/location',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:currentSmartUser,shared:false})}).catch(()=>{})};
+  const oldToggle=window.toggleMyLocation;
+  window.toggleMyLocation=function(){
+    if(typeof oldToggle==='function')oldToggle();
+    setTimeout(()=>{if(sharingMyLocation)startPublish();else stopPublishLocation()},500);
+  };
+
+  /* API real de atletas: mostra TODAS as pessoas cujo compartilhamento está ativo e cujo heartbeat ainda é recente. */
+  window.loadRealAthletes=async function(){
+    if(!SMARTPRO_BACKEND)return;
+    try{
+      const response=await fetch(SMARTPRO_BACKEND.replace(/\/$/,'')+'/athletes/live',{cache:'no-store'});
+      if(!response.ok)throw new Error('API indisponível');
+      const data=await response.json();
+      realAthletes=Array.isArray(data)?data.filter(isValidRealAthlete):[];
+      if(typeof addMarkers==='function')addMarkers(realAthletes);
+      if(typeof updateLiveCount==='function')updateLiveCount();
+    }catch(e){
+      realAthletes=[];
+      if(typeof addMarkers==='function')addMarkers([]);
+      if(typeof updateLiveCount==='function')updateLiveCount();
+    }
+  };
+
+  /* Recarrega usuários reais periodicamente quando uma API existir. */
+  setInterval(()=>{if(typeof current==='string'&&current==='map'&&typeof loadRealAthletes==='function')loadRealAthletes()},3000);
+
+  /* Evita sair do treino sem confirmação. */
+  window.addEventListener('beforeunload',e=>{if(typeof running!=='undefined'&&running){e.preventDefault();e.returnValue='Treino em andamento';}});
+})();
 </script>
 </body>
 </html>
